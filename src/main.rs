@@ -147,6 +147,12 @@ fn main() -> Result<(), io::Error> {
                     },
                     _ => state,
                 };
+            },
+            Event::Key(Key::Char('g')) => {
+                list_state.select(Some(0));
+            },
+            Event::Key(Key::Char('G')) => {
+                list_state.select(Some(list_max - 1));
             }
             _ => (),
         }
