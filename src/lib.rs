@@ -79,7 +79,8 @@ pub fn read_dir<P: AsRef<Path>, F>(path: P, check: F) -> io::Result<Dir>
         .collect())
 }
 
-enum State {
+#[derive(Copy, Clone)]
+pub enum State {
     Artists,
     Albums,
     Songs,
@@ -118,6 +119,10 @@ impl Explorer {
             State::Albums => &mut self.dirs[1],
             State::Songs => &mut self.dirs[2],
         }
+    }
+
+    pub fn selected(&self) -> &DirEntry {
+        self.selected_dir().selected()
     }
 
     pub fn select_next(&mut self) {
@@ -184,6 +189,10 @@ impl Explorer {
             let index = selected.select(len-1);
             self.list_state.select(index);
         }
+    }
+
+    pub fn state(&self) -> State {
+        self.state
     }
 
     pub fn list_state(&mut self) -> &mut ListState {
