@@ -1,9 +1,7 @@
 extern crate tui;
 extern crate termion;
-extern crate rodio;
 
 use std::io;
-use std::fs;
 
 use termion::raw::IntoRawMode;
 use termion::event::{Event, Key};
@@ -17,10 +15,11 @@ use tui::style::{Color, Style, Modifier};
 
 use bebop::*;
 
+mod player;
+use player::Player;
+
 fn main() -> Result<(), io::Error> {
-    let device = rodio::default_output_device().expect("error opening audio device");
-    let mut sink = rodio::Sink::new(&device);
-    sink.set_volume(0.2);
+    let mut player = Player::new(0.2);
 
     let stdout = io::stdout().into_raw_mode()?;
     let backend = TermionBackend::new(stdout);
@@ -78,22 +77,13 @@ fn main() -> Result<(), io::Error> {
             Event::Key(Key::Char('\n')) => {
                 match explorer.state() {
                     State::Songs => {
-                        sink = rodio::Sink::new(&device);
-                        sink.set_volume(0.2);
-
-                        let f = fs::File::open(explorer.selected().path())?;
-                        let source = rodio::Decoder::new(io::BufReader::new(f)).expect("error decoding file");
-                        sink.append(source);
+                        player.play_file(explorer.selected_dir().selected().path())?;
                     },
                     _ => (),
                 }
             },
             Event::Key(Key::Char('p')) => {
-                if sink.is_paused() {
-                    sink.play();
-                } else {
-                    sink.pause();
-                }
+                player.toggle_pause()
             },
             _ => (),
         }
