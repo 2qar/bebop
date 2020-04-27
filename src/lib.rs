@@ -27,7 +27,10 @@ impl DirState {
 
     pub fn entry_strings(&self) -> Vec<String> {
         self.dir.iter()
-            .map(|de| de.path().into_os_string().into_string().unwrap())
+            .map(|de| de.path()
+                 .file_name().unwrap()
+                 .to_os_string()
+                 .into_string().unwrap())
             .collect()
     }
 
