@@ -21,12 +21,13 @@ use player::Player;
 fn main() -> Result<(), io::Error> {
     let mut player = Player::new(0.2);
 
-    let stdout = io::stdout().into_raw_mode()?;
     let mut stdin = termion::async_stdin().events();
-    let backend = TermionBackend::new(stdout);
+
+    let stdout = io::stdout().into_raw_mode()?;
+    let screen = termion::screen::AlternateScreen::from(stdout);
+    let backend = TermionBackend::new(screen);
     let mut terminal = Terminal::new(backend)?;
 
-    terminal.clear()?;
     terminal.hide_cursor()?;
 
     let mut explorer = Explorer::new("/home/tucker/Music")?;
@@ -62,12 +63,7 @@ fn main() -> Result<(), io::Error> {
 
         if let Some(c) = key {
             match c {
-                Event::Key(Key::Char('q')) => {
-                    // TODO: use termion alternate screen to preserve the terminal's state prior to
-                    //       opening this
-                    terminal.clear()?;
-                    return Ok(());
-                },
+                Event::Key(Key::Char('q')) => break,
                 Event::Key(Key::Char('j')) => {
                     explorer.select_next();
                 },
@@ -104,4 +100,6 @@ fn main() -> Result<(), io::Error> {
             }
         }
     }
+
+    Ok(())
 }
