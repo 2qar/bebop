@@ -48,6 +48,8 @@ fn main() -> Result<(), io::Error> {
             f.render_stateful_widget(block, chunks[0], explorer.list_state());
         })?;
 
+        player.advance_if_empty()?;
+
         // FIXME make it less panicky looking
         match io::stdin().events().next().unwrap().unwrap() {
             Event::Key(Key::Char('q')) => {
@@ -78,6 +80,9 @@ fn main() -> Result<(), io::Error> {
                 match explorer.state() {
                     State::Songs => {
                         player.play_file(explorer.selected_dir().selected().path())?;
+                    },
+                    State::Albums => {
+                        player.play_album(explorer.selected_dir().selected().path())?;
                     },
                     _ => (),
                 }
