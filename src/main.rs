@@ -85,10 +85,10 @@ fn main() -> Result<(), io::Error> {
                 Event::Key(Key::Char('\n')) => {
                     match explorer.state() {
                         State::Songs => {
-                            player.play_file(explorer.selected_dir().selected().path())?;
+                            player.play_file(explorer.selected().clone())?;
                         },
                         State::Albums => {
-                            player.play_album(explorer.selected_dir().selected().path())?;
+                            player.play_album(explorer.selected().clone())?;
                         },
                         _ => (),
                     }

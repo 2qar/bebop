@@ -1,12 +1,11 @@
 use std::io;
 use std::fs;
 use std::ffi::OsStr;
-use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 
 use tui::widgets::ListState;
 
-pub type Dir = Vec<DirEntry>;
+pub type Dir = Vec<PathBuf>;
 
 pub struct DirState {
     index: usize,
@@ -20,15 +19,15 @@ impl DirState {
 
     pub fn read_dir<P: AsRef<Path>, F>(path: P, check: F) -> io::Result<DirState>
         where F: Fn(PathBuf) -> bool {
-        let dir = read_dir(path, check)?;
+        let mut dir = read_dir(path, check)?;
+        dir.sort();
 
         Ok(DirState { index: 0, dir })
     }
 
     pub fn entry_strings(&self) -> Vec<String> {
         self.dir.iter()
-            .map(|de| de.path()
-                 .file_name().unwrap()
+            .map(|p| p.file_name().unwrap()
                  .to_os_string()
                  .into_string().unwrap())
             .collect()
@@ -65,7 +64,7 @@ impl DirState {
         }
     }
 
-    pub fn selected(&self) -> &DirEntry {
+    pub fn selected(&self) -> &PathBuf {
         &self.dir[self.index]
     }
 
@@ -78,7 +77,7 @@ pub fn read_dir<P: AsRef<Path>, F>(path: P, check: F) -> io::Result<Dir>
     where F: Fn(PathBuf) -> bool {
     Ok(fs::read_dir(path)?
         .filter(|de| check(de.as_ref().unwrap().path()))
-        .map(|de| de.unwrap())
+        .map(|de| de.unwrap().path())
         .collect())
 }
 
@@ -124,7 +123,7 @@ impl Explorer {
         }
     }
 
-    pub fn selected(&self) -> &DirEntry {
+    pub fn selected(&self) -> &PathBuf {
         self.selected_dir().selected()
     }
 
@@ -141,11 +140,11 @@ impl Explorer {
     pub fn select_next_dir(&mut self) -> io::Result<()> {
         match self.state {
             State::Artists => {
-                self.dirs[1] = DirState::read_dir(self.dirs[0].selected().path(), |p| p.is_dir())?;
+                self.dirs[1] = DirState::read_dir(self.dirs[0].selected(), |p| p.is_dir())?;
                 self.state = State::Albums;
             },
             State::Albums => {
-                self.dirs[2] = DirState::read_dir(self.dirs[1].selected().path(), |p| {
+                self.dirs[2] = DirState::read_dir(self.dirs[1].selected(), |p| {
                     match p.extension() {
                         Some(s) => is_song(s),
                         None => false,
