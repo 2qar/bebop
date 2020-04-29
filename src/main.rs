@@ -23,7 +23,7 @@ fn main() -> Result<(), io::Error> {
         // FIXME: handle it, dummy
         .expect("error creating player");
 
-    let mut stdin = termion::async_stdin().events();
+    let mut stdin = io::stdin().keys();
 
     let stdout = io::stdout().into_raw_mode()?;
     let screen = termion::screen::AlternateScreen::from(stdout);
@@ -55,53 +55,49 @@ fn main() -> Result<(), io::Error> {
 
         player.advance_if_empty()?;
 
-        let key = match stdin.next() {
-            Some(r) => match r {
-                Ok(c) => Some(c),
-                Err(_) => None,
+        match stdin.next() {
+            Some(s) => match s {
+                Ok(k) => match k {
+                    Key::Char('q') => break,
+                    Key::Char('j') => {
+                        explorer.select_next();
+                    },
+                    Key::Char('k') => {
+                        explorer.select_previous();
+                    },
+                    Key::Char('h') => {
+                        explorer.select_previous_dir();
+                    },
+                    Key::Char('l') => {
+                        explorer.select_next_dir()?;
+                    },
+                    Key::Char('g') => {
+                        explorer.top();
+                    },
+                    Key::Char('G') => {
+                        explorer.bottom();
+                    },
+                    Key::Char('\n') => {
+                        match explorer.state() {
+                            State::Songs => {
+                                player.play_file(explorer.selected().clone())?;
+                            },
+                            State::Albums => {
+                                explorer.select_next_dir()?;
+                                player.play_album(explorer.selected_dir().dir());
+                                explorer.select_previous_dir();
+                            },
+                            _ => (),
+                        }
+                    },
+                    Key::Char('p') => {
+                        player.toggle_pause()
+                    },
+                    _ => (),
+                },
+                Err(e) => eprintln!("{}", e),
             },
-            None => None,
-        };
-
-        if let Some(c) = key {
-            match c {
-                Event::Key(Key::Char('q')) => break,
-                Event::Key(Key::Char('j')) => {
-                    explorer.select_next();
-                },
-                Event::Key(Key::Char('k')) => {
-                    explorer.select_previous();
-                },
-                Event::Key(Key::Char('h')) => {
-                    explorer.select_previous_dir();
-                },
-                Event::Key(Key::Char('l')) => {
-                    explorer.select_next_dir()?;
-                },
-                Event::Key(Key::Char('g')) => {
-                    explorer.top();
-                },
-                Event::Key(Key::Char('G')) => {
-                    explorer.bottom();
-                },
-                Event::Key(Key::Char('\n')) => {
-                    match explorer.state() {
-                        State::Songs => {
-                            player.play_file(explorer.selected().clone())?;
-                        },
-                        State::Albums => {
-                            explorer.select_next_dir()?;
-                            player.play_album(explorer.selected_dir().dir());
-                            explorer.select_previous_dir();
-                        },
-                        _ => (),
-                    }
-                },
-                Event::Key(Key::Char('p')) => {
-                    player.toggle_pause()
-                },
-                _ => (),
-            }
+            None => (),
         }
     }
 
