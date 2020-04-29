@@ -71,6 +71,21 @@ impl Player {
             self.sink.pause()
         }
     }
+
+    pub fn volume(&self) -> f32 {
+        self.volume
+    }
+
+    pub fn set_volume(&mut self, v: f32) {
+        self.volume = if v < 0f32 {
+            0f32
+        } else if v > 1f32 {
+            1f32
+        } else {
+            v
+        };
+        self.sink.set_volume(self.volume);
+    }
 }
 
 struct Playlist {

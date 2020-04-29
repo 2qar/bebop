@@ -46,8 +46,9 @@ fn main() -> Result<(), io::Error> {
                 .split(f.size());
 
             let dir_strings = explorer.selected_dir().entry_strings();
+            let volume = format!("Volume: {:.0}", player.volume() * 100f32);
             let block = List::new(dir_strings.iter().map(|de| Text::raw(de)))
-                .block(Block::default().title("Artists").borders(Borders::ALL))
+                .block(Block::default().title(volume.as_str()).borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
             f.render_stateful_widget(block, chunks[0], explorer.list_state());
 
@@ -93,6 +94,14 @@ fn main() -> Result<(), io::Error> {
                     Key::Char('p') => {
                         player.toggle_pause()
                     },
+                    Key::Char('-') => {
+                        let volume = player.volume() - 0.01f32;
+                        player.set_volume(volume);
+                    },
+                    Key::Char('+') => {
+                        let volume = player.volume() + 0.01f32;
+                        player.set_volume(volume);
+                    }
                     _ => (),
                 },
                 Err(e) => eprintln!("{}", e),
