@@ -4,7 +4,7 @@ extern crate termion;
 use std::io;
 
 use termion::raw::IntoRawMode;
-use termion::event::{Event, Key};
+use termion::event::Key;
 use termion::input::TermRead;
 
 use tui::Terminal;

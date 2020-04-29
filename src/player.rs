@@ -1,14 +1,12 @@
 extern crate rodio;
 
-use std::fs;
-
 use std::io;
 use std::fs::File;
-use std::io::{BufReader, ErrorKind};
+use std::io::BufReader;
 use std::path::PathBuf;
 
 pub struct Player {
-    stream: rodio::OutputStream,
+    _stream: rodio::OutputStream,
     stream_handle: rodio::OutputStreamHandle,
     sink: rodio::Sink,
     volume: f32,
@@ -17,10 +15,10 @@ pub struct Player {
 
 impl Player {
     pub fn new(volume: f32) -> Result<Player, rodio::StreamError> {
-        let (stream, stream_handle) = rodio::OutputStream::try_default()?;
+        let (_stream, stream_handle) = rodio::OutputStream::try_default()?;
         let (sink, _) = rodio::Sink::new_idle();
 
-        Ok(Player { stream, stream_handle, sink, volume, playlist: Playlist::new(Vec::new()) })
+        Ok(Player { _stream, stream_handle, sink, volume, playlist: Playlist::new(Vec::new()) })
     }
 
     fn reset_sink(&mut self) {
