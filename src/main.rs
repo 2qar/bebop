@@ -54,8 +54,6 @@ fn main() -> Result<(), io::Error> {
 
         })?;
 
-        player.advance_if_empty()?;
-
         match stdin.next() {
             Some(s) => match s {
                 Ok(k) => match k {
@@ -85,7 +83,7 @@ fn main() -> Result<(), io::Error> {
                             },
                             State::Albums => {
                                 explorer.select_next_dir()?;
-                                player.play_album(explorer.selected_dir().dir());
+                                player.play_album(explorer.selected_dir().dir())?;
                                 explorer.select_previous_dir();
                             },
                             _ => (),

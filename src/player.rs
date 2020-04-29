@@ -10,7 +10,6 @@ pub struct Player {
     stream_handle: rodio::OutputStreamHandle,
     sink: rodio::Sink,
     volume: f32,
-    playlist: Playlist,
 }
 
 impl Player {
@@ -18,7 +17,7 @@ impl Player {
         let (_stream, stream_handle) = rodio::OutputStream::try_default()?;
         let (sink, _) = rodio::Sink::new_idle();
 
-        Ok(Player { _stream, stream_handle, sink, volume, playlist: Playlist::new(Vec::new()) })
+        Ok(Player { _stream, stream_handle, sink, volume })
     }
 
     fn reset_sink(&mut self) {
@@ -40,23 +39,16 @@ impl Player {
         Ok(())
     }
 
-    pub fn play_album(&mut self, d: &Vec<PathBuf>) {
+    pub fn play_album(&mut self, dir: &Vec<PathBuf>) -> io::Result<()> {
         self.reset_sink();
 
-        let song_paths = d.iter().map(|p| p.clone()).collect();
-        self.playlist = Playlist::new(song_paths);
-    }
-
-    /// advance_if_empty starts playing the next song if nothing is playing
-    pub fn advance_if_empty(&mut self) -> io::Result<()> {
-        if self.sink.empty() {
-            match self.playlist.next() {
-                Some(p) => {
-                    self.play_file(p)?;
-                },
-                None => (),
-            };
+        for path in dir {
+            let f = File::open(path)?;
+            let source = rodio::Decoder::new(BufReader::new(f))
+                .expect("error decoding file");
+            self.sink.append(source);
         }
+
         Ok(())
     }
 
@@ -85,27 +77,5 @@ impl Player {
             v
         };
         self.sink.set_volume(self.volume);
-    }
-}
-
-struct Playlist {
-    paths: Vec<PathBuf>,
-}
-
-impl Playlist {
-    pub fn new(paths: Vec<PathBuf>) -> Playlist {
-        Playlist { paths }
-    }
-}
-
-impl Iterator for Playlist {
-    type Item = PathBuf;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.paths.len() > 0 {
-            Some(self.paths.remove(0))
-        } else {
-            None
-        }
     }
 }
