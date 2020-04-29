@@ -90,7 +90,9 @@ fn main() -> Result<(), io::Error> {
                             player.play_file(explorer.selected().clone())?;
                         },
                         State::Albums => {
-                            player.play_album(explorer.selected().clone())?;
+                            explorer.select_next_dir()?;
+                            player.play_album(explorer.selected_dir().dir());
+                            explorer.select_previous_dir();
                         },
                         _ => (),
                     }

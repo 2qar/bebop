@@ -33,6 +33,10 @@ impl DirState {
             .collect()
     }
 
+    pub fn dir(&self) -> &Dir {
+        &self.dir
+    }
+
     pub fn entries(&self) -> usize {
         self.dir.len()
     }

@@ -42,19 +42,11 @@ impl Player {
         Ok(())
     }
 
-    pub fn play_album(&mut self, p: PathBuf) -> io::Result<()> {
-        if !p.is_dir() {
-            return Err(io::Error::new(ErrorKind::InvalidInput, "path isn't a directory"));
-        }
-
-        let mut song_paths: Vec<PathBuf> = Vec::new();
-        for e in fs::read_dir(p)? {
-            song_paths.push(e.unwrap().path());
-        }
-
+    pub fn play_album(&mut self, d: &Vec<PathBuf>) {
         self.reset_sink();
+
+        let song_paths = d.iter().map(|p| p.clone()).collect();
         self.playlist = Playlist::new(song_paths);
-        Ok(())
     }
 
     /// advance_if_empty starts playing the next song if nothing is playing
