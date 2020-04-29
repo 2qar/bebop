@@ -19,7 +19,9 @@ mod player;
 use player::Player;
 
 fn main() -> Result<(), io::Error> {
-    let mut player = Player::new(0.2);
+    let mut player = Player::new(0.2)
+        // FIXME: handle it, dummy
+        .expect("error creating player");
 
     let mut stdin = termion::async_stdin().events();
 

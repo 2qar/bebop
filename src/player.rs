@@ -7,34 +7,36 @@ use std::fs::File;
 use std::io::{BufReader, ErrorKind};
 use std::path::PathBuf;
 
-use rodio::{Sink, Device};
-
 pub struct Player {
-    device: Device,
-    sink: Sink,
+    stream: rodio::OutputStream,
+    stream_handle: rodio::OutputStreamHandle,
+    sink: rodio::Sink,
     volume: f32,
     playlist: Playlist,
 }
 
 impl Player {
-    pub fn new(volume: f32) -> Player {
-        let device = rodio::default_output_device().expect("error opening audio device");
-        let sink = Sink::new(&device);
-        sink.set_volume(volume);
+    pub fn new(volume: f32) -> Result<Player, rodio::StreamError> {
+        let (stream, stream_handle) = rodio::OutputStream::try_default()?;
+        let (sink, _) = rodio::Sink::new_idle();
 
-        Player { device, sink, volume, playlist: Playlist::new(Vec::new()) }
+        Ok(Player { stream, stream_handle, sink, volume, playlist: Playlist::new(Vec::new()) })
     }
 
     fn reset_sink(&mut self) {
-        self.sink = Sink::new(&self.device);
+        // FIXME: actually handle the error instead of just expecting
+        self.sink = rodio::Sink::try_new(&self.stream_handle)
+            .expect("error opening sink");
         self.sink.set_volume(self.volume);
     }
 
     pub fn play_file(&mut self, p: PathBuf) -> io::Result<()> {
-        self.reset_sink();
-
         let f = File::open(p)?;
-        let source = rodio::Decoder::new(BufReader::new(f)).expect("error decoding file");
+        let source = rodio::Decoder::new(BufReader::new(f))
+            // FIXME: handle the error, dummy
+            .expect("error decoding file");
+
+        self.reset_sink();
         self.sink.append(source);
 
         Ok(())
@@ -50,6 +52,7 @@ impl Player {
             song_paths.push(e.unwrap().path());
         }
 
+        self.reset_sink();
         self.playlist = Playlist::new(song_paths);
         Ok(())
     }
