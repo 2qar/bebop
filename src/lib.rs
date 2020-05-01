@@ -178,6 +178,14 @@ impl Explorer {
         self.update_selection()
     }
 
+    // TODO: make this correct
+    pub fn current_dir_name(&self) -> String {
+        self.selected()
+            .as_os_str()
+            .to_os_string()
+            .into_string().unwrap_or_else(|_| "Music".to_string())
+    }
+
     pub fn update_selection(&mut self) {
         let index = self.selected_dir().index();
         self.list_state.select(Some(index));

@@ -9,7 +9,7 @@ use termion::input::TermRead;
 
 use tui::Terminal;
 use tui::backend::TermionBackend;
-use tui::widgets::{List, Block, Borders, Text};
+use tui::widgets::{List, Block, Borders, Text, ListState};
 use tui::layout::{Layout, Constraint, Direction};
 use tui::style::{Color, Style, Modifier};
 
@@ -32,26 +32,42 @@ fn main() -> Result<(), io::Error> {
 
     terminal.hide_cursor()?;
 
+    let mut playing_selected = ListState::default();
+    playing_selected.select(None);
+
     let mut explorer = Explorer::new("/home/tucker/Music")?;
     loop {
         terminal.draw(|mut f| {
             let chunks = Layout::default()
-                .direction(Direction::Vertical)
+                .direction(Direction::Horizontal)
                 .constraints(
                     [
-                    Constraint::Percentage(100),
-                    Constraint::Percentage(10),
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(50),
                     ].as_ref()
                 )
                 .split(f.size());
 
             let dir_strings = explorer.selected_dir().entry_strings();
-            let volume = format!("Volume: {:.0}", player.volume() * 100f32);
+            let current_dir = explorer.current_dir_name();
             let block = List::new(dir_strings.iter().map(|de| Text::raw(de)))
-                .block(Block::default().title(volume.as_str()).borders(Borders::ALL))
+                .block(Block::default().title(&current_dir).borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
             f.render_stateful_widget(block, chunks[0], explorer.list_state());
 
+            if player.playing().len() > 0 {
+                playing_selected.select(Some(player.index()));
+            }
+            let playing_strings: Vec<String> = player.playing().iter()
+                .map(|p| p.file_name().unwrap()
+                     .to_os_string()
+                     .into_string().unwrap())
+                .collect();
+            let volume = format!("Volume: {:.0}", player.volume() * 100f32);
+            let block = List::new(playing_strings.iter().map(|de| Text::raw(de)))
+                .block(Block::default().title(&volume).borders(Borders::ALL))
+                .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
+            f.render_stateful_widget(block, chunks[1], &mut playing_selected);
         })?;
 
         match stdin.next() {
@@ -79,11 +95,11 @@ fn main() -> Result<(), io::Error> {
                     Key::Char('\n') => {
                         match explorer.state() {
                             State::Songs => {
-                                player.play_file(explorer.selected().clone())?;
+                                player.play_song(explorer.selected().clone())?;
                             },
                             State::Albums => {
                                 explorer.select_next_dir()?;
-                                player.play_album(explorer.selected_dir().dir())?;
+                                player.play_songs(explorer.selected_dir().dir().clone())?;
                                 explorer.select_previous_dir();
                             },
                             _ => (),

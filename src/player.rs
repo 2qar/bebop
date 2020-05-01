@@ -2,14 +2,20 @@ extern crate rodio;
 
 use std::io;
 use std::fs::File;
+use std::sync::Arc;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::sync::atomic::{Ordering, AtomicUsize};
+
+use rodio::source::Done;
 
 pub struct Player {
     _stream: rodio::OutputStream,
     stream_handle: rodio::OutputStreamHandle,
     sink: rodio::Sink,
     volume: f32,
+    playing: Vec<PathBuf>,
+    remaining: Arc<AtomicUsize>,
 }
 
 impl Player {
@@ -17,7 +23,10 @@ impl Player {
         let (_stream, stream_handle) = rodio::OutputStream::try_default()?;
         let (sink, _) = rodio::Sink::new_idle();
 
-        Ok(Player { _stream, stream_handle, sink, volume })
+        let playing = Vec::new();
+        let remaining = Arc::new(AtomicUsize::new(0));
+
+        Ok(Player { _stream, stream_handle, sink, volume, playing, remaining })
     }
 
     fn reset_sink(&mut self) {
@@ -27,37 +36,36 @@ impl Player {
         self.sink.set_volume(self.volume);
     }
 
-    pub fn play_file(&mut self, p: PathBuf) -> io::Result<()> {
-        let f = File::open(p)?;
-        let source = rodio::Decoder::new(BufReader::new(f))
-            // FIXME: handle the error, dummy
-            .expect("error decoding file");
-
-        self.reset_sink();
-        self.sink.append(source);
-
-        Ok(())
+    pub fn play_song(&mut self, p: PathBuf) -> io::Result<()> {
+        self.play_songs(vec![p])
     }
 
-    pub fn play_album(&mut self, dir: &Vec<PathBuf>) -> io::Result<()> {
+    pub fn play_songs(&mut self, dir: Vec<PathBuf>) -> io::Result<()> {
         self.reset_sink();
+        let remaining = &self.remaining;
+        remaining.store(dir.len(), Ordering::Relaxed);
+        self.playing = dir.clone(); // ew
 
         for path in dir {
             let f = File::open(path)?;
             let source = rodio::Decoder::new(BufReader::new(f))
                 .expect("error decoding file");
-            self.sink.append(source);
+            self.sink.append(Done::new(source, self.remaining.clone()));
         }
 
         Ok(())
     }
 
-    pub fn is_paused(&self) -> bool {
-        self.sink.is_paused()
+    pub fn playing(&self) -> &Vec<PathBuf> {
+        &self.playing
+    }
+
+    pub fn index(&self) -> usize {
+        self.playing.len() - self.remaining.load(Ordering::Relaxed)
     }
 
     pub fn toggle_pause(&self) {
-        if self.is_paused() {
+        if self.sink.is_paused() {
             self.sink.play()
         } else {
             self.sink.pause()
