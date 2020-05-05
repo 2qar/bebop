@@ -72,6 +72,16 @@ impl DirState {
         &self.dir[self.index]
     }
 
+    pub fn selected_name(&self) -> Option<String> {
+        match self.selected().file_name() {
+            Some(s) => match s.to_os_string().into_string() {
+                Ok(s) => Some(s),
+                Err(_) => None,
+            },
+            None => None,
+        }
+    }
+
     pub fn index(&self) -> usize {
         self.index
     }
@@ -178,12 +188,12 @@ impl Explorer {
         self.update_selection()
     }
 
-    // TODO: make this correct
-    pub fn current_dir_name(&self) -> String {
-        self.selected()
-            .as_os_str()
-            .to_os_string()
-            .into_string().unwrap_or_else(|_| "Music".to_string())
+    pub fn current_dir_name(&self) -> Option<String> {
+        match self.state {
+            State::Artists => Some("Music".to_string()),
+            State::Albums => self.dirs[0].selected_name(),
+            State::Songs => self.dirs[1].selected_name()
+        }
     }
 
     pub fn update_selection(&mut self) {

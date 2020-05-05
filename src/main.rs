@@ -49,7 +49,7 @@ fn main() -> Result<(), io::Error> {
                 .split(f.size());
 
             let dir_strings = explorer.selected_dir().entry_strings();
-            let current_dir = explorer.current_dir_name();
+            let current_dir = explorer.current_dir_name().unwrap_or_else(|| "Music".to_string());
             let block = List::new(dir_strings.iter().map(|de| Text::raw(de)))
                 .block(Block::default().title(&current_dir).borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
