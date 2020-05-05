@@ -1,6 +1,3 @@
-extern crate tui;
-extern crate termion;
-
 use std::io;
 
 use termion::raw::IntoRawMode;

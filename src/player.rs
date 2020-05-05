@@ -1,5 +1,3 @@
-extern crate rodio;
-
 use std::io;
 use std::fs::File;
 use std::sync::Arc;
