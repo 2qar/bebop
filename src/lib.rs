@@ -1,24 +1,23 @@
-use std::io;
-use std::fs;
 use std::ffi::OsStr;
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use tui::widgets::ListState;
 
 pub type Dir = Vec<PathBuf>;
 
+#[derive(Default)]
 pub struct DirState {
     index: usize,
     dir: Dir,
 }
 
 impl DirState {
-    pub fn new() -> DirState {
-        DirState { index: 0, dir: Vec::new() }
-    }
-
     pub fn read_dir<P: AsRef<Path>, F>(path: P, check: F) -> io::Result<DirState>
-        where F: Fn(PathBuf) -> bool {
+    where
+        F: Fn(PathBuf) -> bool,
+    {
         let mut dir = read_dir(path, check)?;
         dir.sort();
 
@@ -26,10 +25,9 @@ impl DirState {
     }
 
     pub fn entry_strings(&self) -> Vec<String> {
-        self.dir.iter()
-            .map(|p| p.file_name().unwrap()
-                 .to_os_string()
-                 .into_string().unwrap())
+        self.dir
+            .iter()
+            .map(|p| p.file_name().unwrap().to_os_string().into_string().unwrap())
             .collect()
     }
 
@@ -41,7 +39,7 @@ impl DirState {
         self.dir.len()
     }
 
-    pub fn next(&mut self) -> usize {
+    pub fn select_next(&mut self) -> usize {
         if self.index == self.dir.len() - 1 {
             self.index = 0;
         } else {
@@ -50,7 +48,7 @@ impl DirState {
         self.index
     }
 
-    pub fn previous(&mut self) -> usize {
+    pub fn select_previous(&mut self) -> usize {
         if self.index == 0 {
             self.index = self.dir.len() - 1;
         } else {
@@ -88,7 +86,9 @@ impl DirState {
 }
 
 pub fn read_dir<P: AsRef<Path>, F>(path: P, check: F) -> io::Result<Dir>
-    where F: Fn(PathBuf) -> bool {
+where
+    F: Fn(PathBuf) -> bool,
+{
     Ok(fs::read_dir(path)?
         .filter(|de| check(de.as_ref().unwrap().path()))
         .map(|de| de.unwrap().path())
@@ -112,13 +112,17 @@ impl Explorer {
     pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Explorer> {
         let dirs = [
             DirState::read_dir(path, |p| p.is_dir())?,
-            DirState::new(),
-            DirState::new(),
+            DirState::default(),
+            DirState::default(),
         ];
         let mut list_state = ListState::default();
         list_state.select(Some(0));
 
-        Ok(Explorer { dirs, state: State::Artists, list_state })
+        Ok(Explorer {
+            dirs,
+            state: State::Artists,
+            list_state,
+        })
     }
 
     pub fn selected_dir(&self) -> &DirState {
@@ -142,12 +146,12 @@ impl Explorer {
     }
 
     pub fn select_next(&mut self) {
-        let index = self.selected_dir_mut().next();
+        let index = self.selected_dir_mut().select_next();
         self.list_state.select(Some(index));
     }
 
     pub fn select_previous(&mut self) {
-        let index = self.selected_dir_mut().previous();
+        let index = self.selected_dir_mut().select_previous();
         self.list_state.select(Some(index));
     }
 
@@ -156,16 +160,15 @@ impl Explorer {
             State::Artists => {
                 self.dirs[1] = DirState::read_dir(self.dirs[0].selected(), |p| p.is_dir())?;
                 self.state = State::Albums;
-            },
+            }
             State::Albums => {
-                self.dirs[2] = DirState::read_dir(self.dirs[1].selected(), |p| {
-                    match p.extension() {
+                self.dirs[2] =
+                    DirState::read_dir(self.dirs[1].selected(), |p| match p.extension() {
                         Some(s) => is_song(s),
                         None => false,
-                    }
-                })?;
+                    })?;
                 self.state = State::Songs;
-            },
+            }
             _ => (),
         }
 
@@ -178,13 +181,13 @@ impl Explorer {
         match self.state {
             State::Albums => {
                 self.state = State::Artists;
-            },
+            }
             State::Songs => {
                 self.state = State::Albums;
-            },
+            }
             _ => (),
         }
-        
+
         self.update_selection()
     }
 
@@ -192,7 +195,7 @@ impl Explorer {
         match self.state {
             State::Artists => Some("Music".to_string()),
             State::Albums => self.dirs[0].selected_name(),
-            State::Songs => self.dirs[1].selected_name()
+            State::Songs => self.dirs[1].selected_name(),
         }
     }
 
@@ -210,7 +213,7 @@ impl Explorer {
         let selected = self.selected_dir_mut();
         let len = selected.entries();
         if len > 0 {
-            let index = selected.select(len-1);
+            let index = selected.select(len - 1);
             self.list_state.select(index);
         }
     }

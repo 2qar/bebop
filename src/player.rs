@@ -1,9 +1,9 @@
-use std::io;
 use std::fs::File;
-use std::sync::Arc;
+use std::io;
 use std::io::BufReader;
 use std::path::PathBuf;
-use std::sync::atomic::{Ordering, AtomicUsize};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use rodio::source::Done;
 
@@ -24,13 +24,19 @@ impl Player {
         let playing = Vec::new();
         let remaining = Arc::new(AtomicUsize::new(0));
 
-        Ok(Player { _stream, stream_handle, sink, volume, playing, remaining })
+        Ok(Player {
+            _stream,
+            stream_handle,
+            sink,
+            volume,
+            playing,
+            remaining,
+        })
     }
 
     fn reset_sink(&mut self) {
         // FIXME: actually handle the error instead of just expecting
-        self.sink = rodio::Sink::try_new(&self.stream_handle)
-            .expect("error opening sink");
+        self.sink = rodio::Sink::try_new(&self.stream_handle).expect("error opening sink");
         self.sink.set_volume(self.volume);
     }
 
@@ -46,8 +52,7 @@ impl Player {
 
         for path in dir {
             let f = File::open(path)?;
-            let source = rodio::Decoder::new(BufReader::new(f))
-                .expect("error decoding file");
+            let source = rodio::Decoder::new(BufReader::new(f)).expect("error decoding file");
             self.sink.append(Done::new(source, self.remaining.clone()));
         }
 
