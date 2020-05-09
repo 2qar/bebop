@@ -41,16 +41,16 @@ impl Player {
     }
 
     pub fn play_song(&mut self, p: PathBuf) -> io::Result<()> {
-        self.play_songs(vec![p])
+        self.play_songs(0, vec![p])
     }
 
-    pub fn play_songs(&mut self, dir: Vec<PathBuf>) -> io::Result<()> {
+    pub fn play_songs(&mut self, start: usize, dir: Vec<PathBuf>) -> io::Result<()> {
         self.reset_sink();
         let remaining = &self.remaining;
-        remaining.store(dir.len(), Ordering::Relaxed);
-        self.playing = dir.clone(); // ew
+        remaining.store(dir.len() - start, Ordering::Relaxed);
+        self.playing = dir.clone();
 
-        for path in dir {
+        for path in dir[start..].to_vec() {
             let f = File::open(path)?;
             let source = rodio::Decoder::new(BufReader::new(f)).expect("error decoding file");
             self.sink.append(Done::new(source, self.remaining.clone()));

@@ -92,7 +92,7 @@ fn main() -> Result<(), io::Error> {
                         }
                         State::Albums => {
                             explorer.select_next_dir()?;
-                            player.play_songs(explorer.selected_dir().dir().clone())?;
+                            player.play_songs(0, explorer.selected_dir().dir().clone())?;
                             explorer.select_previous_dir();
                         }
                         _ => (),
@@ -105,6 +105,18 @@ fn main() -> Result<(), io::Error> {
                     Key::Char('+') => {
                         let volume = player.volume() + 0.01f32;
                         player.set_volume(volume);
+                    }
+                    Key::Char('b') => {
+                        let index = player.index();
+                        if index > 0 {
+                            player.play_songs(index-1, player.playing().to_vec())?;
+                        }
+                    }
+                    Key::Char('w') => {
+                        let index = player.index();
+                        if index < player.playing().len()-1 {
+                            player.play_songs(index+1, player.playing().to_vec())?;
+                        }
                     }
                     _ => (),
                 },
