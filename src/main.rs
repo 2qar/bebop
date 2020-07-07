@@ -109,13 +109,13 @@ fn main() -> Result<(), io::Error> {
                     Key::Char('b') => {
                         let index = player.index();
                         if index > 0 {
-                            player.play_songs(index-1, player.playing().to_vec())?;
+                            player.play_songs(index - 1, player.playing().to_vec())?;
                         }
                     }
                     Key::Char('w') => {
                         let index = player.index();
-                        if index < player.playing().len()-1 {
-                            player.play_songs(index+1, player.playing().to_vec())?;
+                        if index < player.playing().len() - 1 {
+                            player.play_songs(index + 1, player.playing().to_vec())?;
                         }
                     }
                     _ => (),
