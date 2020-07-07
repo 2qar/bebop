@@ -85,6 +85,10 @@ fn main() -> Result<(), io::Error> {
             if let Ok(key) = s {
                 if !search.is_empty() {
                     if let Key::Char(c) = key {
+                        if c == '\n' {
+                            search.clear();
+                            continue;
+                        }
                         search.push(c);
                         explorer.search(&search[1..]);
                     } else if let Key::Backspace = key {
