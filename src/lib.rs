@@ -83,6 +83,15 @@ impl DirState {
     pub fn index(&self) -> usize {
         self.index
     }
+
+    pub fn find(&self, name: &str) -> Option<usize> {
+        self.entry_strings().iter().position(|s| {
+            if let Some(_) = s.to_lowercase().find(&name.to_lowercase()) {
+                return true;
+            }
+            return false;
+        })
+    }
 }
 
 pub fn read_dir<P: AsRef<Path>, F>(path: P, check: F) -> io::Result<Dir>
@@ -215,6 +224,13 @@ impl Explorer {
         if len > 0 {
             let index = selected.select(len - 1);
             self.list_state.select(index);
+        }
+    }
+
+    pub fn search(&mut self, s: &str) {
+        if let Some(i) = self.selected_dir().find(s) {
+            self.selected_dir_mut().select(i);
+            self.list_state.select(Some(i));
         }
     }
 

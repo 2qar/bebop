@@ -32,13 +32,25 @@ fn main() -> Result<(), io::Error> {
     let mut playing_selected = ListState::default();
     playing_selected.select(None);
 
+    // TODO: this shouldn't be hardcoded
     let mut explorer = Explorer::new("/home/tucker/Music")?;
+
+    let mut search = String::new();
+
     loop {
         terminal.draw(|mut f| {
+            let mut constraints = [Constraint::Percentage(100), Constraint::Percentage(0)];
+            if !search.is_empty() {
+                constraints = [Constraint::Percentage(98), Constraint::Percentage(2)];
+            }
             let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(constraints.as_ref())
+                .split(f.size());
+            let main = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .split(f.size());
+                .split(chunks[0]);
 
             let dir_strings = explorer.selected_dir().entry_strings();
             let current_dir = explorer
@@ -47,7 +59,7 @@ fn main() -> Result<(), io::Error> {
             let block = List::new(dir_strings.iter().map(Text::raw))
                 .block(Block::default().title(&current_dir).borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
-            f.render_stateful_widget(block, chunks[0], explorer.list_state());
+            f.render_stateful_widget(block, main[0], explorer.list_state());
 
             if !player.playing().is_empty() {
                 playing_selected.select(Some(player.index()));
@@ -61,10 +73,30 @@ fn main() -> Result<(), io::Error> {
             let block = List::new(playing_strings.iter().map(Text::raw))
                 .block(Block::default().title(&volume).borders(Borders::ALL))
                 .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
-            f.render_stateful_widget(block, chunks[1], &mut playing_selected);
+            f.render_stateful_widget(block, main[1], &mut playing_selected);
+
+            let search_bar = Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+                .title(&search);
+            f.render_widget(search_bar, chunks[1]);
         })?;
 
         if let Some(s) = stdin.next() {
+            if let Ok(key) = s {
+                if !search.is_empty() {
+                    if let Key::Char(c) = key {
+                        search.push(c);
+                        explorer.search(&search[1..]);
+                    } else if let Key::Backspace = key {
+                        search.pop();
+                    } else {
+                        search.clear();
+                    }
+                    // kinda dumb
+                    continue;
+                }
+            }
+
             match s {
                 Ok(k) => match k {
                     Key::Char('q') => break,
@@ -117,6 +149,9 @@ fn main() -> Result<(), io::Error> {
                         if index < player.playing().len() - 1 {
                             player.play_songs(index + 1, player.playing().to_vec())?;
                         }
+                    }
+                    Key::Char('/') => {
+                        search.push('/');
                     }
                     _ => (),
                 },
