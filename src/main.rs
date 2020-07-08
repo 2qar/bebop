@@ -39,10 +39,11 @@ fn main() -> Result<(), io::Error> {
 
     loop {
         terminal.draw(|mut f| {
-            let mut constraints = [Constraint::Percentage(100), Constraint::Percentage(0)];
-            if !search.is_empty() {
-                constraints = [Constraint::Percentage(98), Constraint::Percentage(2)];
-            }
+            let constraints = if search.is_empty() {
+                [Constraint::Percentage(100), Constraint::Percentage(0)]
+            } else {
+                [Constraint::Percentage(98), Constraint::Percentage(2)]
+            };
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(constraints.as_ref())
