@@ -32,8 +32,9 @@ fn main() -> Result<(), io::Error> {
     let mut playing_selected = ListState::default();
     playing_selected.select(None);
 
-    // TODO: this shouldn't be hardcoded
-    let mut explorer = Explorer::new("/home/tucker/Music")?;
+    let music_dir = std::env::var("BEBOP_MUSIC_DIR")
+        .expect("BEBOP_MUSIC_DIR not set");
+    let mut explorer = Explorer::new(music_dir)?;
 
     let mut search = String::new();
 
