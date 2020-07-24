@@ -19,9 +19,11 @@ fn main() -> Result<(), io::Error> {
     let mut player = Player::new(0.2)
         // FIXME: handle it, dummy
         .expect("error creating player");
+    let music_dir = std::env::var("BEBOP_MUSIC_DIR")
+        .expect("BEBOP_MUSIC_DIR not set");
+    let mut explorer = Explorer::new(music_dir)?;
 
     let mut stdin = io::stdin().keys();
-
     let stdout = io::stdout().into_raw_mode()?;
     let screen = termion::screen::AlternateScreen::from(stdout);
     let backend = TermionBackend::new(screen);
@@ -31,10 +33,6 @@ fn main() -> Result<(), io::Error> {
 
     let mut playing_selected = ListState::default();
     playing_selected.select(None);
-
-    let music_dir = std::env::var("BEBOP_MUSIC_DIR")
-        .expect("BEBOP_MUSIC_DIR not set");
-    let mut explorer = Explorer::new(music_dir)?;
 
     let mut search = String::new();
 
