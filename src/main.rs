@@ -131,7 +131,9 @@ fn main() -> Result<(), io::Error> {
                             player.play_songs(0, explorer.selected_dir().dir().clone())?;
                             explorer.select_previous_dir();
                         }
-                        _ => (),
+                        State::Artists => {
+                            explorer.select_next_dir()?;
+                        }
                     },
                     Key::Char('p') => player.toggle_pause(),
                     Key::Char('-') => {
