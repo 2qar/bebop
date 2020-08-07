@@ -1,4 +1,9 @@
+use std::fs::OpenOptions;
 use std::io;
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
+use std::thread;
 
 use termion::event::Key;
 use termion::input::TermRead;
@@ -16,12 +21,10 @@ mod player;
 use player::Player;
 
 fn main() -> Result<(), io::Error> {
-    let mut player = Player::new(0.2)
-        // FIXME: handle it, dummy
-        .expect("error creating player");
-    let music_dir = std::env::var("BEBOP_MUSIC_DIR")
-        .expect("BEBOP_MUSIC_DIR not set");
+    let mut player = Player::new(0.2).expect("error creating player");
+    let music_dir = std::env::var("BEBOP_MUSIC_DIR").expect("BEBOP_MUSIC_DIR not set");
     let mut explorer = Explorer::new(music_dir)?;
+    let status_file_path = std::env::var("BEBOP_STATUS_FILE_PATH").unwrap_or_default();
 
     let mut stdin = io::stdin().keys();
     let stdout = io::stdout().into_raw_mode()?;
@@ -35,6 +38,7 @@ fn main() -> Result<(), io::Error> {
     playing_selected.select(None);
 
     let mut search = String::new();
+    let mut song_switch_receiver: Receiver<usize>;
 
     loop {
         terminal.draw(|mut f| {
@@ -128,8 +132,41 @@ fn main() -> Result<(), io::Error> {
                         }
                         State::Albums => {
                             explorer.select_next_dir()?;
-                            player.play_songs(0, explorer.selected_dir().dir().clone())?;
+                            song_switch_receiver =
+                                player.play_songs(0, explorer.selected_dir().dir().clone())?;
+                            let songs = explorer.selected_dir().dir().clone();
                             explorer.select_previous_dir();
+                            // TODO: write first song to file, then do it every time a signal comes
+                            //       in on the song_switch_receiver
+                            if !status_file_path.is_empty() {
+                                let path = status_file_path.clone();
+                                write_status(&path, &songs[0]);
+                                thread::spawn(move || loop {
+                                    match song_switch_receiver.recv() {
+                                        Ok(i) => {
+                                            write_status(&path, &songs[songs.len() - i]);
+                                        }
+                                        Err(_) => {
+                                            break;
+                                        }
+                                    }
+                                });
+                                /*
+                                let path = explorer.selected();
+                                let album = path.file_name()
+                                    // TODO: stupid
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap();
+                                let artist = path.parent()
+                                    .unwrap()
+                                    .file_name()
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap();
+                                write!(&mut status_file, "{}\n{}\n{}/cover.jpg\n", album, artist, path.to_str().unwrap())?;
+                                */
+                            }
                         }
                         State::Artists => {
                             explorer.select_next_dir()?;
@@ -167,4 +204,32 @@ fn main() -> Result<(), io::Error> {
     }
 
     Ok(())
+}
+
+fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)?;
+    // FIXME: these are fuckin dumb
+    // TODO: strip ".mp3" and maybe track # from filename
+    let song_name = playing.file_name().unwrap().to_str().unwrap();
+    let artist = playing
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap();
+
+    write!(
+        &mut file,
+        "{}\n{}\n{}/cover.jpg\n",
+        song_name,
+        artist,
+        playing.parent().unwrap().to_str().unwrap()
+    )
 }
