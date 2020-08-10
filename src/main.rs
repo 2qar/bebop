@@ -144,6 +144,9 @@ fn main() -> Result<(), io::Error> {
                                 thread::spawn(move || loop {
                                     match song_switch_receiver.recv() {
                                         Ok(i) => {
+                                            if i == 0 {
+                                                break;
+                                            }
                                             write_status(&path, &songs[songs.len() - i]);
                                         }
                                         Err(_) => {
