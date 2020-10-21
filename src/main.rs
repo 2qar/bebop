@@ -136,39 +136,28 @@ fn main() -> Result<(), io::Error> {
                                 player.play_songs(0, explorer.selected_dir().dir().clone())?;
                             let songs = explorer.selected_dir().dir().clone();
                             explorer.select_previous_dir();
-                            // TODO: write first song to file, then do it every time a signal comes
-                            //       in on the song_switch_receiver
                             if !status_file_path.is_empty() {
                                 let path = status_file_path.clone();
-                                write_status(&path, &songs[0]);
+                                match write_status(&path, &songs[0]) {
+                                    Ok(_) => (),
+                                    Err(e) => eprintln!("error writing status: {}", e),
+                                }
                                 thread::spawn(move || loop {
                                     match song_switch_receiver.recv() {
                                         Ok(i) => {
                                             if i == 0 {
                                                 break;
                                             }
-                                            write_status(&path, &songs[songs.len() - i]);
+                                            match write_status(&path, &songs[songs.len() - i]) {
+                                                Ok(_) => (),
+                                                Err(e) => eprintln!("error writing status: {}", e),
+                                            };
                                         }
                                         Err(_) => {
                                             break;
                                         }
                                     }
                                 });
-                                /*
-                                let path = explorer.selected();
-                                let album = path.file_name()
-                                    // TODO: stupid
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap();
-                                let artist = path.parent()
-                                    .unwrap()
-                                    .file_name()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap();
-                                write!(&mut status_file, "{}\n{}\n{}/cover.jpg\n", album, artist, path.to_str().unwrap())?;
-                                */
                             }
                         }
                         State::Artists => {
