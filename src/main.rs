@@ -157,20 +157,12 @@ fn main() -> Result<(), io::Error> {
                                     Ok(_) => (),
                                     Err(e) => eprintln!("error writing status: {}", e),
                                 }
-                                thread::spawn(move || loop {
-                                    match song_switch_receiver.recv() {
-                                        Ok(i) => {
-                                            if i == 0 {
-                                                break;
-                                            }
-                                            match write_status(&path, &songs[songs.len() - i]) {
-                                                Ok(_) => (),
-                                                Err(e) => eprintln!("error writing status: {}", e),
-                                            };
-                                        }
-                                        Err(_) => {
-                                            break;
-                                        }
+                                thread::spawn(move || while let Ok(i) = song_switch_receiver.recv() {
+                                    if i == 0 {
+                                        break;
+                                    }
+                                    if let Err(e) = write_status(&path, &songs[songs.len() - i]) {
+                                        eprintln!("error writing status: {}", e);
                                     }
                                 });
                             }
