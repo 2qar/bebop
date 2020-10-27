@@ -4,13 +4,14 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::thread;
+use std::time;
 
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
 use tui::backend::TermionBackend;
-use tui::layout::{Constraint, Direction, Layout};
+use tui::layout::{Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, ListState, Text};
 use tui::Terminal;
@@ -26,11 +27,13 @@ fn main() -> Result<(), io::Error> {
     let mut explorer = Explorer::new(music_dir)?;
     let status_file_path = std::env::var("BEBOP_STATUS_FILE_PATH").unwrap_or_default();
 
-    let mut stdin = io::stdin().keys();
+    let mut stdin = termion::async_stdin().keys();
     let stdout = io::stdout().into_raw_mode()?;
     let screen = termion::screen::AlternateScreen::from(stdout);
     let backend = TermionBackend::new(screen);
     let mut terminal = Terminal::new(backend)?;
+    let mut last_size = Rect::new(0, 0, 0, 0);
+    let mut redraw = true;
 
     terminal.hide_cursor()?;
 
@@ -41,51 +44,63 @@ fn main() -> Result<(), io::Error> {
     let mut song_switch_receiver: Receiver<usize>;
 
     loop {
-        terminal.draw(|mut f| {
-            let constraints = if search.is_empty() {
-                [Constraint::Percentage(100), Constraint::Percentage(0)]
-            } else {
-                [Constraint::Percentage(98), Constraint::Percentage(2)]
-            };
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(constraints.as_ref())
-                .split(f.size());
-            let main = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .split(chunks[0]);
+        if redraw {
+            terminal.draw(|mut f| {
+                let constraints = if search.is_empty() {
+                    [Constraint::Percentage(100), Constraint::Percentage(0)]
+                } else {
+                    [Constraint::Percentage(98), Constraint::Percentage(2)]
+                };
+                let chunks = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(constraints.as_ref())
+                    .split(f.size());
+                let main = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                    .split(chunks[0]);
 
-            let dir_strings = explorer.selected_dir().entry_strings();
-            let current_dir = explorer
-                .current_dir_name()
-                .unwrap_or_else(|| "Music".to_string());
-            let block = List::new(dir_strings.iter().map(Text::raw))
-                .block(Block::default().title(&current_dir).borders(Borders::ALL))
-                .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
-            f.render_stateful_widget(block, main[0], explorer.list_state());
+                let dir_strings = explorer.selected_dir().entry_strings();
+                let current_dir = explorer
+                    .current_dir_name()
+                    .unwrap_or_else(|| "Music".to_string());
+                let block = List::new(dir_strings.iter().map(Text::raw))
+                    .block(Block::default().title(&current_dir).borders(Borders::ALL))
+                    .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
+                f.render_stateful_widget(block, main[0], explorer.list_state());
 
-            if !player.playing().is_empty() {
-                playing_selected.select(Some(player.index()));
+                if !player.playing().is_empty() {
+                    playing_selected.select(Some(player.index()));
+                }
+                let playing_strings: Vec<String> = player
+                    .playing()
+                    .iter()
+                    .map(|p| p.file_name().unwrap().to_os_string().into_string().unwrap())
+                    .collect();
+                let volume = format!("Volume: {:.0}", player.volume() * 100f32);
+                let block = List::new(playing_strings.iter().map(Text::raw))
+                    .block(Block::default().title(&volume).borders(Borders::ALL))
+                    .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
+                f.render_stateful_widget(block, main[1], &mut playing_selected);
+
+                let search_bar = Block::default()
+                    .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+                    .title(&search);
+                f.render_widget(search_bar, chunks[1]);
+            })?;
+
+            redraw = false;
+        }
+
+        if let Ok(size) = terminal.size() {
+            if size != last_size {
+                redraw = true;
+                last_size = size;
             }
-            let playing_strings: Vec<String> = player
-                .playing()
-                .iter()
-                .map(|p| p.file_name().unwrap().to_os_string().into_string().unwrap())
-                .collect();
-            let volume = format!("Volume: {:.0}", player.volume() * 100f32);
-            let block = List::new(playing_strings.iter().map(Text::raw))
-                .block(Block::default().title(&volume).borders(Borders::ALL))
-                .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
-            f.render_stateful_widget(block, main[1], &mut playing_selected);
-
-            let search_bar = Block::default()
-                .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
-                .title(&search);
-            f.render_widget(search_bar, chunks[1]);
-        })?;
+        }
 
         if let Some(s) = stdin.next() {
+            redraw =  true;
             if let Ok(key) = s {
                 if !search.is_empty() {
                     if let Key::Char(c) = key {
@@ -193,6 +208,10 @@ fn main() -> Result<(), io::Error> {
                 Err(e) => eprintln!("{}", e),
             }
         }
+
+        // FIXME: there's gotta be a better way to not use 100% cpu w/ async_stdin
+        //        other than this
+        thread::sleep(time::Duration::from_millis(1));
     }
 
     Ok(())
