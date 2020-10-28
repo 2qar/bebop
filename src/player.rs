@@ -129,7 +129,9 @@ where
         if !self.sent && next.is_none() {
             // with Ordering::Relaxed these might happen out of order, but idk xd
             self.num.fetch_sub(1, Ordering::Relaxed);
-            self.sender.send(self.num.load(Ordering::Relaxed));
+            if let Err(e) = self.sender.send(self.num.load(Ordering::Relaxed)) {
+                eprintln!("error writing to channel: {}", e);
+            }
             self.sent = true;
         }
         next
