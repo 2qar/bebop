@@ -2,209 +2,64 @@ use std::fs::OpenOptions;
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::channel;
 use std::thread;
-use std::time;
 
-use termion::event::Key;
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
+use termion::screen::AlternateScreen;
+use termion::raw::{IntoRawMode, RawTerminal};
 
 use tui::backend::TermionBackend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, List, ListState, Text};
 use tui::Terminal;
 
-use bebop::{Explorer, Player, State};
+use bebop::{Explorer, Player, Event};
+use bebop::input::{send_input, handle_input};
+use bebop::layout::draw;
 
 fn main() -> Result<(), io::Error> {
     let mut player = Player::new(0.2).expect("error creating player");
     let music_dir = std::env::var("BEBOP_MUSIC_DIR").expect("BEBOP_MUSIC_DIR not set");
     let mut explorer = Explorer::new(music_dir)?;
+    // TODO: reintegrate writing to status file w/ the new structure and stuff
     let status_file_path = std::env::var("BEBOP_STATUS_FILE_PATH").unwrap_or_default();
 
-    let mut stdin = termion::async_stdin().keys();
     let stdout = io::stdout().into_raw_mode()?;
-    let screen = termion::screen::AlternateScreen::from(stdout);
+    let screen = AlternateScreen::from(stdout);
     let backend = TermionBackend::new(screen);
     let mut terminal = Terminal::new(backend)?;
-    let mut last_size = Rect::new(0, 0, 0, 0);
-    let mut redraw = true;
 
     terminal.hide_cursor()?;
 
-    let mut playing_selected = ListState::default();
-    playing_selected.select(None);
-
     let mut search = String::new();
-    let mut song_switch_receiver: Receiver<usize>;
+    let (event_sender, event_receiver) = channel::<Event>();
+
+    let input_sender = event_sender.clone();
+    thread::spawn(move || {
+        send_input(input_sender);
+    });
+
+    // TODO: give an event_sender to the player for when songs change
+    // TODO: add a signal handler for SIGWINCH and give it an event_sender
 
     loop {
-        if redraw {
-            terminal.draw(|mut f| {
-                let constraints = if search.is_empty() {
-                    [Constraint::Percentage(100), Constraint::Percentage(0)]
-                } else {
-                    [Constraint::Percentage(98), Constraint::Percentage(2)]
-                };
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints(constraints.as_ref())
-                    .split(f.size());
-                let main = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                    .split(chunks[0]);
-
-                let dir_strings = explorer.selected_dir().entry_strings();
-                let current_dir = explorer
-                    .current_dir_name()
-                    .unwrap_or_else(|| "Music".to_string());
-                let block = list(&current_dir, &dir_strings);
-                f.render_stateful_widget(block, main[0], explorer.list_state());
-
-                if !player.playing().is_empty() {
-                    playing_selected.select(Some(player.index()));
+        //FIXME: this is really long and bad and gross.
+        //     ewwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+        draw::<TermionBackend<AlternateScreen<RawTerminal<io::Stdout>>>>(&mut terminal, &mut explorer, &mut player, &search)?;
+        
+        match event_receiver.recv() {
+            Ok(event) => {
+                let quit = handle_input(event, &mut explorer, &mut player, &mut search)?;
+                if quit {
+                    break;
                 }
-                let playing_strings: Vec<String> = player
-                    .playing()
-                    .iter()
-                    .map(|p| p.file_name().unwrap().to_os_string().into_string().unwrap())
-                    .collect();
-                let volume = format!("Volume: {:.0}", player.volume() * 100f32);
-                let block = list(&volume, &playing_strings);
-                f.render_stateful_widget(block, main[1], &mut playing_selected);
-
-                let search_bar = Block::default()
-                    .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
-                    .title(&search);
-                f.render_widget(search_bar, chunks[1]);
-            })?;
-
-            redraw = false;
+            },
+            Err(e) => println!("error receiving event: {}", e),
         }
-
-        if let Ok(size) = terminal.size() {
-            if size != last_size {
-                redraw = true;
-                last_size = size;
-            }
-        }
-
-        if let Some(s) = stdin.next() {
-            redraw = true;
-            if let Ok(key) = s {
-                if !search.is_empty() {
-                    if let Key::Char(c) = key {
-                        if c == '\n' {
-                            search.clear();
-                            continue;
-                        }
-                        search.push(c);
-                        explorer.search(&search[1..]);
-                    } else if let Key::Backspace = key {
-                        search.pop();
-                    } else {
-                        search.clear();
-                    }
-                    // kinda dumb
-                    continue;
-                }
-            }
-
-            match s {
-                Ok(k) => match k {
-                    Key::Char('q') => break,
-                    Key::Char('j') => {
-                        explorer.select_next();
-                    }
-                    Key::Char('k') => {
-                        explorer.select_previous();
-                    }
-                    Key::Char('h') => {
-                        explorer.select_previous_dir();
-                    }
-                    Key::Char('l') => {
-                        explorer.select_next_dir()?;
-                    }
-                    Key::Char('g') => {
-                        explorer.top();
-                    }
-                    Key::Char('G') => {
-                        explorer.bottom();
-                    }
-                    Key::Char('\n') => match explorer.state() {
-                        State::Songs => {
-                            player.play_song(explorer.selected().clone())?;
-                        }
-                        State::Albums => {
-                            explorer.select_next_dir()?;
-                            song_switch_receiver =
-                                player.play_songs(0, explorer.selected_dir().dir().clone())?;
-                            let songs = explorer.selected_dir().dir().clone();
-                            explorer.select_previous_dir();
-                            if !status_file_path.is_empty() {
-                                let path = status_file_path.clone();
-                                match write_status(&path, &songs[0]) {
-                                    Ok(_) => (),
-                                    Err(e) => eprintln!("error writing status: {}", e),
-                                }
-                                thread::spawn(move || {
-                                    while let Ok(i) = song_switch_receiver.recv() {
-                                        if i == 0 {
-                                            break;
-                                        }
-                                        if let Err(e) = write_status(&path, &songs[songs.len() - i])
-                                        {
-                                            eprintln!("error writing status: {}", e);
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                        State::Artists => {
-                            explorer.select_next_dir()?;
-                        }
-                    },
-                    Key::Char('p') => player.toggle_pause(),
-                    Key::Char('-') => {
-                        let volume = player.volume() - 0.01f32;
-                        player.set_volume(volume);
-                    }
-                    Key::Char('+') => {
-                        let volume = player.volume() + 0.01f32;
-                        player.set_volume(volume);
-                    }
-                    Key::Char('b') => {
-                        let index = player.index();
-                        if index > 0 {
-                            player.play_songs(index - 1, player.playing().to_vec())?;
-                        }
-                    }
-                    Key::Char('w') => {
-                        let index = player.index();
-                        if index < player.playing().len() - 1 {
-                            player.play_songs(index + 1, player.playing().to_vec())?;
-                        }
-                    }
-                    Key::Char('/') => {
-                        search.push('/');
-                    }
-                    _ => (),
-                },
-                Err(e) => eprintln!("{}", e),
-            }
-        }
-
-        // FIXME: there's gotta be a better way to not use 100% cpu w/ async_stdin
-        //        other than this
-        thread::sleep(time::Duration::from_millis(1));
     }
 
     Ok(())
 }
 
+// TODO: move this outta the main file
 fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
@@ -231,15 +86,4 @@ fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
         artist,
         playing.parent().unwrap().to_str().unwrap()
     )
-}
-
-fn list<'a>(
-    title: &'a str,
-    items: &'a Vec<String>,
-) -> List<'a, impl Iterator<Item = Text<'a>> + 'a> {
-    let block = Block::default().title(title).borders(Borders::ALL);
-    let style = Style::default().bg(Color::Green).modifier(Modifier::BOLD);
-    List::new(items.iter().map(Text::raw))
-        .block(block)
-        .highlight_style(style)
 }

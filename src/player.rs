@@ -10,8 +10,10 @@ use std::time::Duration;
 
 use rodio::source::Source;
 use rodio::Sample;
+use tui::widgets::ListState;
 
 pub struct Player {
+    pub list_state: ListState,
     _stream: rodio::OutputStream,
     stream_handle: rodio::OutputStreamHandle,
     sink: rodio::Sink,
@@ -22,6 +24,8 @@ pub struct Player {
 
 impl Player {
     pub fn new(volume: f32) -> Result<Player, rodio::StreamError> {
+        let list_state = ListState::default();
+
         let (_stream, stream_handle) = rodio::OutputStream::try_default()?;
         let (sink, _) = rodio::Sink::new_idle();
 
@@ -29,6 +33,7 @@ impl Player {
         let remaining = Arc::new(AtomicUsize::new(0));
 
         Ok(Player {
+            list_state,
             _stream,
             stream_handle,
             sink,
