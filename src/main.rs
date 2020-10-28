@@ -16,10 +16,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, ListState, Text};
 use tui::Terminal;
 
-use bebop::*;
-
-mod player;
-use player::Player;
+use bebop::{Explorer, Player, State};
 
 fn main() -> Result<(), io::Error> {
     let mut player = Player::new(0.2).expect("error creating player");
@@ -96,7 +93,7 @@ fn main() -> Result<(), io::Error> {
         }
 
         if let Some(s) = stdin.next() {
-            redraw =  true;
+            redraw = true;
             if let Ok(key) = s {
                 if !search.is_empty() {
                     if let Key::Char(c) = key {
@@ -153,12 +150,15 @@ fn main() -> Result<(), io::Error> {
                                     Ok(_) => (),
                                     Err(e) => eprintln!("error writing status: {}", e),
                                 }
-                                thread::spawn(move || while let Ok(i) = song_switch_receiver.recv() {
-                                    if i == 0 {
-                                        break;
-                                    }
-                                    if let Err(e) = write_status(&path, &songs[songs.len() - i]) {
-                                        eprintln!("error writing status: {}", e);
+                                thread::spawn(move || {
+                                    while let Ok(i) = song_switch_receiver.recv() {
+                                        if i == 0 {
+                                            break;
+                                        }
+                                        if let Err(e) = write_status(&path, &songs[songs.len() - i])
+                                        {
+                                            eprintln!("error writing status: {}", e);
+                                        }
                                     }
                                 });
                             }
@@ -233,7 +233,10 @@ fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
     )
 }
 
-fn list<'a>(title: &'a str, items: &'a Vec<String>) -> List<'a, impl Iterator<Item = Text<'a>> + 'a> {
+fn list<'a>(
+    title: &'a str,
+    items: &'a Vec<String>,
+) -> List<'a, impl Iterator<Item = Text<'a>> + 'a> {
     let block = Block::default().title(title).borders(Borders::ALL);
     let style = Style::default().bg(Color::Green).modifier(Modifier::BOLD);
     List::new(items.iter().map(Text::raw))
