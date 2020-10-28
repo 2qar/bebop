@@ -64,9 +64,7 @@ fn main() -> Result<(), io::Error> {
                 let current_dir = explorer
                     .current_dir_name()
                     .unwrap_or_else(|| "Music".to_string());
-                let block = List::new(dir_strings.iter().map(Text::raw))
-                    .block(Block::default().title(&current_dir).borders(Borders::ALL))
-                    .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
+                let block = list(&current_dir, &dir_strings);
                 f.render_stateful_widget(block, main[0], explorer.list_state());
 
                 if !player.playing().is_empty() {
@@ -78,9 +76,7 @@ fn main() -> Result<(), io::Error> {
                     .map(|p| p.file_name().unwrap().to_os_string().into_string().unwrap())
                     .collect();
                 let volume = format!("Volume: {:.0}", player.volume() * 100f32);
-                let block = List::new(playing_strings.iter().map(Text::raw))
-                    .block(Block::default().title(&volume).borders(Borders::ALL))
-                    .highlight_style(Style::default().bg(Color::Green).modifier(Modifier::BOLD));
+                let block = list(&volume, &playing_strings);
                 f.render_stateful_widget(block, main[1], &mut playing_selected);
 
                 let search_bar = Block::default()
@@ -235,4 +231,12 @@ fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
         artist,
         playing.parent().unwrap().to_str().unwrap()
     )
+}
+
+fn list<'a>(title: &'a str, items: &'a Vec<String>) -> List<'a, impl Iterator<Item = Text<'a>> + 'a> {
+    let block = Block::default().title(title).borders(Borders::ALL);
+    let style = Style::default().bg(Color::Green).modifier(Modifier::BOLD);
+    List::new(items.iter().map(Text::raw))
+        .block(block)
+        .highlight_style(style)
 }
