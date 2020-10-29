@@ -57,12 +57,14 @@ fn main() -> Result<(), io::Error> {
 
         match event_receiver.recv() {
             Ok(event) => {
+                // FIXME: 6 parameters? gotta be a better way
                 let quit = handle_input(
                     event,
                     &mut explorer,
                     &mut player,
                     &mut search,
                     &status_file_path,
+                    &event_sender,
                 )?;
                 if quit {
                     break;

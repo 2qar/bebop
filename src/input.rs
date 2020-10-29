@@ -27,6 +27,7 @@ pub fn handle_input(
     player: &mut Player,
     search: &mut String,
     status_file_path: &str,
+    event_sender: &Sender<Event>,
 ) -> io::Result<bool> {
     let key = match event {
         Event::Input(k) => k,
@@ -82,22 +83,28 @@ pub fn handle_input(
                     player.play_songs(0, explorer.selected_dir().dir().clone())?;
                 let songs = explorer.selected_dir().dir().clone();
                 explorer.select_previous_dir();
-                if !status_file_path.is_empty() {
-                    let path = status_file_path.to_owned();
-                    if let Err(e) = write_status(&path, &songs[0]) {
-                        eprintln!("error writing status: {}", e);
-                    }
-                    thread::spawn(move || {
-                        while let Ok(i) = song_switch_receiver.recv() {
-                            if i == 0 {
-                                break;
-                            }
+
+                let path = if status_file_path.is_empty() {
+                    String::new()
+                } else {
+                    status_file_path.to_owned()
+                };
+                if let Err(e) = write_status(&path, &songs[0]) {
+                    eprintln!("error writing status: {}", e);
+                }
+                let redraw_sender = event_sender.clone();
+                thread::spawn(move || {
+                    while let Ok(i) = song_switch_receiver.recv() {
+                        if let Err(e) = redraw_sender.send(Event::Redraw) {
+                            eprintln!("error sending redraw on song change: {}", e);
+                        }
+                        if i != 0 {
                             if let Err(e) = write_status(&path, &songs[songs.len() - i]) {
                                 eprintln!("error writing status: {}", e);
                             }
                         }
-                    });
-                }
+                    }
+                });
             }
             State::Artists => {
                 explorer.select_next_dir()?;
