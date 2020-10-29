@@ -2,15 +2,15 @@ use std::io;
 use std::sync::mpsc::channel;
 use std::thread;
 
-use termion::screen::AlternateScreen;
+use signal_hook::iterator::Signals;
 use termion::raw::{IntoRawMode, RawTerminal};
+use termion::screen::AlternateScreen;
 use tui::backend::TermionBackend;
 use tui::Terminal;
-use signal_hook::iterator::Signals;
 
-use bebop::{Explorer, Player, Event};
-use bebop::input::{send_input, handle_input};
+use bebop::input::{handle_input, send_input};
 use bebop::layout::draw;
+use bebop::{Event, Explorer, Player};
 
 fn main() -> Result<(), io::Error> {
     let mut player = Player::new(0.2).expect("error creating player");
@@ -48,15 +48,26 @@ fn main() -> Result<(), io::Error> {
     loop {
         //FIXME: this is really long and bad and gross.
         //     ewwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
-        draw::<TermionBackend<AlternateScreen<RawTerminal<io::Stdout>>>>(&mut terminal, &mut explorer, &mut player, &search)?;
-        
+        draw::<TermionBackend<AlternateScreen<RawTerminal<io::Stdout>>>>(
+            &mut terminal,
+            &mut explorer,
+            &mut player,
+            &search,
+        )?;
+
         match event_receiver.recv() {
             Ok(event) => {
-                let quit = handle_input(event, &mut explorer, &mut player, &mut search, &status_file_path)?;
+                let quit = handle_input(
+                    event,
+                    &mut explorer,
+                    &mut player,
+                    &mut search,
+                    &status_file_path,
+                )?;
                 if quit {
                     break;
                 }
-            },
+            }
             Err(e) => println!("error receiving event: {}", e),
         }
     }

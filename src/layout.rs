@@ -1,14 +1,19 @@
 use std::io;
 
+use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, List, Text};
 use tui::Terminal;
-use tui::backend::Backend;
 
 use crate::{Explorer, Player};
 
-pub fn draw<B: Backend>(terminal: &mut Terminal<B>, explorer: &mut Explorer, player: &mut Player, search: &str) -> io::Result<()> {
+pub fn draw<B: Backend>(
+    terminal: &mut Terminal<B>,
+    explorer: &mut Explorer,
+    player: &mut Player,
+    search: &str,
+) -> io::Result<()> {
     terminal.draw(|mut f| {
         let constraints = if search.is_empty() {
             [Constraint::Percentage(100), Constraint::Percentage(0)]
