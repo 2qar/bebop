@@ -7,9 +7,9 @@ use std::thread;
 
 use termion::screen::AlternateScreen;
 use termion::raw::{IntoRawMode, RawTerminal};
-
 use tui::backend::TermionBackend;
 use tui::Terminal;
+use signal_hook::iterator::Signals;
 
 use bebop::{Explorer, Player, Event};
 use bebop::input::{send_input, handle_input};
@@ -37,8 +37,17 @@ fn main() -> Result<(), io::Error> {
         send_input(input_sender);
     });
 
+    let resize_sender = event_sender.clone();
+    let signals = Signals::new(&[signal_hook::SIGWINCH])?;
+    thread::spawn(move || {
+        for _ in signals.forever() {
+            if let Err(e) = resize_sender.send(Event::Redraw) {
+                eprintln!("error writing to event channel: {}", e);
+            }
+        }
+    });
+
     // TODO: give an event_sender to the player for when songs change
-    // TODO: add a signal handler for SIGWINCH and give it an event_sender
 
     loop {
         //FIXME: this is really long and bad and gross.

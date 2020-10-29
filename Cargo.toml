@@ -10,3 +10,4 @@ edition = "2018"
 rodio = { git = "https://github.com/BigHeadGeorge/rodio", branch = "engineless" }
 tui = "0.9.1"
 termion = "1.5"
+signal-hook = "0.1.16"
