@@ -1,7 +1,4 @@
-use std::fs::OpenOptions;
 use std::io;
-use std::io::Write;
-use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::thread;
 
@@ -19,7 +16,6 @@ fn main() -> Result<(), io::Error> {
     let mut player = Player::new(0.2).expect("error creating player");
     let music_dir = std::env::var("BEBOP_MUSIC_DIR").expect("BEBOP_MUSIC_DIR not set");
     let mut explorer = Explorer::new(music_dir)?;
-    // TODO: reintegrate writing to status file w/ the new structure and stuff
     let status_file_path = std::env::var("BEBOP_STATUS_FILE_PATH").unwrap_or_default();
 
     let stdout = io::stdout().into_raw_mode()?;
@@ -56,7 +52,7 @@ fn main() -> Result<(), io::Error> {
         
         match event_receiver.recv() {
             Ok(event) => {
-                let quit = handle_input(event, &mut explorer, &mut player, &mut search)?;
+                let quit = handle_input(event, &mut explorer, &mut player, &mut search, &status_file_path)?;
                 if quit {
                     break;
                 }
@@ -66,33 +62,4 @@ fn main() -> Result<(), io::Error> {
     }
 
     Ok(())
-}
-
-// TODO: move this outta the main file
-fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(path)?;
-    // FIXME: these are fuckin dumb
-    // TODO: strip ".mp3" and maybe track # from filename
-    let song_name = playing.file_name().unwrap().to_str().unwrap();
-    let artist = playing
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap();
-
-    write!(
-        &mut file,
-        "{}\n{}\n{}/cover.jpg\n",
-        song_name,
-        artist,
-        playing.parent().unwrap().to_str().unwrap()
-    )
 }

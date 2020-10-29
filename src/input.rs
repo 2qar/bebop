@@ -1,4 +1,8 @@
 use std::io;
+use std::thread;
+use std::io::Write;
+use std::path::PathBuf;
+use std::fs::OpenOptions;
 use termion::event::Key;
 use termion::input::TermRead;
 use std::sync::mpsc::Sender;
@@ -17,7 +21,7 @@ pub fn send_input(s: Sender<Event>) {
     }
 }
 
-pub fn handle_input(event: Event, explorer: &mut Explorer, player: &mut Player, search: &mut String) -> io::Result<bool> {
+pub fn handle_input(event: Event, explorer: &mut Explorer, player: &mut Player, search: &mut String, status_file_path: &str) -> io::Result<bool> {
     let key = match event {
         Event::Input(k) => k,
         _ => return Ok(false),
@@ -68,28 +72,27 @@ pub fn handle_input(event: Event, explorer: &mut Explorer, player: &mut Player, 
             }
             State::Albums => {
                 explorer.select_next_dir()?;
-                //song_switch_receiver =
-                player.play_songs(0, explorer.selected_dir().dir().clone())?;
-                //let songs = explorer.selected_dir().dir().clone();
+                let song_switch_receiver = player.play_songs(0, explorer.selected_dir().dir().clone())?;
+                let songs = explorer.selected_dir().dir().clone();
                 explorer.select_previous_dir();
-                //if !status_file_path.is_empty() {
-                //    let path = status_file_path.clone();
-                //    match write_status(&path, &songs[0]) {
-                //        Ok(_) => (),
-                //        Err(e) => eprintln!("error writing status: {}", e),
-                //    }
-                //    thread::spawn(move || {
-                //        while let Ok(i) = song_switch_receiver.recv() {
-                //            if i == 0 {
-                //                break;
-                //            }
-                //            if let Err(e) = write_status(&path, &songs[songs.len() - i])
-                //            {
-                //                eprintln!("error writing status: {}", e);
-                //            }
-                //        }
-                //    });
-                //}
+                if !status_file_path.is_empty() {
+                    let path = status_file_path.to_owned();
+                    match write_status(&path, &songs[0]) {
+                        Ok(_) => (),
+                        Err(e) => eprintln!("error writing status: {}", e),
+                    }
+                    thread::spawn(move || {
+                        while let Ok(i) = song_switch_receiver.recv() {
+                            if i == 0 {
+                                break;
+                            }
+                            if let Err(e) = write_status(&path, &songs[songs.len() - i])
+                            {
+                                eprintln!("error writing status: {}", e);
+                            }
+                        }
+                    });
+                }
             }
             State::Artists => {
                 explorer.select_next_dir()?;
@@ -123,4 +126,32 @@ pub fn handle_input(event: Event, explorer: &mut Explorer, player: &mut Player, 
     }
 
     Ok(quit)
+}
+
+fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)?;
+    // FIXME: these are fuckin dumb
+    // TODO: strip ".mp3" and maybe track # from filename
+    let song_name = playing.file_name().unwrap().to_str().unwrap();
+    let artist = playing
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap();
+
+    write!(
+        &mut file,
+        "{}\n{}\n{}/cover.jpg\n",
+        song_name,
+        artist,
+        playing.parent().unwrap().to_str().unwrap()
+    )
 }
