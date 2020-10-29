@@ -71,7 +71,7 @@ pub fn handle_input(event: Event, explorer: &mut Explorer, player: &mut Player, 
                 //song_switch_receiver =
                 player.play_songs(0, explorer.selected_dir().dir().clone())?;
                 //let songs = explorer.selected_dir().dir().clone();
-                //explorer.select_previous_dir();
+                explorer.select_previous_dir();
                 //if !status_file_path.is_empty() {
                 //    let path = status_file_path.clone();
                 //    match write_status(&path, &songs[0]) {
