@@ -133,9 +133,10 @@ where
         let next = self.input.next();
         if !self.sent && next.is_none() {
             // with Ordering::Relaxed these might happen out of order, but idk xd
-            self.num.fetch_sub(1, Ordering::Relaxed);
-            if let Err(e) = self.sender.send(self.num.load(Ordering::Relaxed)) {
-                eprintln!("error writing to channel: {}", e);
+            let n = self.num.fetch_sub(1, Ordering::Relaxed);
+            let result = self.sender.send(self.num.load(Ordering::Relaxed));
+            if n != 1 && result.is_err() {
+                eprintln!("error writing to channel: {}", result.err().unwrap());
             }
             self.sent = true;
         }
