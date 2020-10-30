@@ -43,8 +43,6 @@ fn main() -> Result<(), io::Error> {
         }
     });
 
-    // TODO: give an event_sender to the player for when songs change
-
     loop {
         //FIXME: this is really long and bad and gross.
         //     ewwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
