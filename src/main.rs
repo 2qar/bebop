@@ -1,6 +1,9 @@
 use std::io;
+use std::io::Write;
 use std::sync::mpsc::channel;
 use std::thread;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 use signal_hook::iterator::Signals;
 use termion::raw::{IntoRawMode, RawTerminal};
@@ -8,7 +11,7 @@ use termion::screen::AlternateScreen;
 use tui::backend::TermionBackend;
 use tui::Terminal;
 
-use bebop::input::{handle_input, send_input};
+use bebop::input::{Action, handle_input, send_input};
 use bebop::layout::draw;
 use bebop::{Event, Explorer, Player};
 
@@ -54,23 +57,76 @@ fn main() -> Result<(), io::Error> {
         )?;
 
         match event_receiver.recv() {
-            Ok(event) => {
-                // FIXME: 6 parameters? gotta be a better way
-                let quit = handle_input(
+            Ok(event) => match handle_input(
                     event,
                     &mut explorer,
                     &mut player,
                     &mut search,
-                    &status_file_path,
-                    &event_sender,
-                )?;
-                if quit {
-                    break;
+                ) {
+                Ok(a) => match a {
+                    Action::Play(song_switch_receiver) => {
+                        let songs = player.playing().clone();
+
+                        let path = if status_file_path.is_empty() {
+                            String::new()
+                        } else {
+                            status_file_path.to_owned()
+                        };
+                        if let Err(e) = write_status(&path, &songs[player.index()]) {
+                            eprintln!("error writing status: {}", e);
+                        }
+
+                        let redraw_sender = event_sender.clone();
+                        thread::spawn(move || {
+                            while let Ok(i) = song_switch_receiver.recv() {
+                                if let Err(e) = redraw_sender.send(Event::Redraw) {
+                                    eprintln!("error sending redraw on song change: {}", e);
+                                }
+                                if i != 0 {
+                                    if let Err(e) = write_status(&path, &songs[songs.len() - i]) {
+                                        eprintln!("error writing status: {}", e);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    Action::Quit => break,
+                    Action::None => (),
                 }
+                Err(e) => eprintln!("error handling input: {}", e),
             }
             Err(e) => println!("error receiving event: {}", e),
         }
     }
 
     Ok(())
+}
+
+// TODO: move this to a new file along with the song switch stuff, maybe
+fn write_status(path: &str, playing: &PathBuf) -> io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)?;
+    // FIXME: these are fuckin dumb
+    // TODO: strip ".mp3" and maybe track # from filename
+    let song_name = playing.file_name().unwrap().to_str().unwrap();
+    let artist = playing
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap();
+
+    write!(
+        &mut file,
+        "{}\n{}\n{}/cover.jpg\n",
+        song_name,
+        artist,
+        playing.parent().unwrap().to_str().unwrap()
+    )
 }
